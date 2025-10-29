@@ -1,0 +1,74 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+haigc_env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ComfyUI specific
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+output/
+temp/
+cache/
+
+# Logs
+*.log
+
+# OS
+Thumbs.db
+desktop.ini
+
+# Test files
+# test_*.py  # 保留test_nodes.py作为示例
+*_test.py
+tests/
+
+# Temporary files
+tmp/
+*.tmp
+*.bak
+*.backup
+
+# Font files (too large for git, users should download separately)
+font/*.ttf
+font/*.otf
+font/*.ttc
+font/*.TTF
+font/*.OTF
+font/*.TTC
+!font/.gitkeep
+!font/*.md
+!font/*.txt
+
