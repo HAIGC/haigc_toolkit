@@ -14,7 +14,7 @@
 
 ## 📖 简介
 
-HAIGC Toolkit 是一套专为 ComfyUI 设计的高质量视频和图片处理节点集合。提供专业级的字幕添加、视频过渡转场，全中文界面，开箱即用。
+HAIGC Toolkit 是一套专为 ComfyUI 设计的视频字幕及视频处理节点。提供专业级的字幕添加、视频过渡转场，全中文界面，开箱即用。
 
 ## ✨ 核心特性
 
@@ -238,8 +238,8 @@ pip install -r requirements.txt
 <div align="center">
 
 **如果这个项目对你有帮助，请给个 ⭐️ Star 支持一下！**
-comfyui工作流云平台推荐：https://www.runninghub.cn/user-center/1887871050510716930/userPost?inviteCode=rh-v1127
-国际站：https://www.runninghub.ai/user-center/1939305513756864513/userPost?inviteCode=rh-v1127
+**comfyui工作流云平台推荐：https://www.runninghub.cn/user-center/1887871050510716930/userPost?inviteCode=rh-v1127**
+**国际站：https://www.runninghub.ai/user-center/1939305513756864513/userPost?inviteCode=rh-v1127**
 
 Made with ❤️ by HAIGC 
 
