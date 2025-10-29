@@ -238,8 +238,9 @@ pip install -r requirements.txt
 <div align="center">
 
 **如果这个项目对你有帮助，请给个 ⭐️ Star 支持一下！**
-**comfyui工作流云平台推荐：https://www.runninghub.cn/user-center/1887871050510716930/userPost?inviteCode=rh-v1127**
-**国际站：https://www.runninghub.ai/user-center/1939305513756864513/userPost?inviteCode=rh-v1127**
+
+## comfyui工作流云平台推荐：https://www.runninghub.cn/user-center/1887871050510716930/userPost?inviteCode=rh-v1127
+## 国际站：https://www.runninghub.ai/user-center/1939305513756864513/userPost?inviteCode=rh-v1127
 
 Made with ❤️ by HAIGC 
 
