@@ -4,7 +4,7 @@
 
 **专业的ComfyUI视频和图片处理工具集**
 
-[![Version](https://img.shields.io/badge/version-2.0.1-blue.svg)](https://github.com/yourusername/haigc_toolkit)
+[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/yourusername/haigc_toolkit)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Compatible-orange.svg)](https://github.com/comfyanonymous/ComfyUI)
 
@@ -14,14 +14,16 @@
 
 ## 📖 简介
 
-HAIGC Toolkit 是一套专为 ComfyUI 设计视频添加字幕节点。提供专业级的字幕添加、视频过渡，全中文界面，开箱即用。
+HAIGC Toolkit 是一套专为 ComfyUI 设计的高质量视频和图片处理节点集合。提供专业级的字幕添加、视频过渡、图片批处理等功能，全中文界面，开箱即用。
 
 ## ✨ 核心特性
 
 - 🎬 **专业字幕系统** - 支持渐变、描边、动效、横竖排版
-- 🎨 **丰富视觉效果** - 28种字幕动效、3种渐变模式
+- 🎨 **丰富视觉效果** - 28种字幕动效、5种渐变模式
 - 🎯 **精确时间控制** - 支持帧数/秒数双模式
+- 🚀 **高性能渲染** - numpy矢量化算法，性能提升10-100倍
 - 🌐 **全中文界面** - 无需英文基础，直观易用
+- 🔧 **模块化设计** - 节点可自由组合，灵活强大
 
 ## 📦 安装方法
 
@@ -30,7 +32,7 @@ HAIGC Toolkit 是一套专为 ComfyUI 设计视频添加字幕节点。提供专
 1. 进入 ComfyUI 的 `custom_nodes` 目录
 2. 克隆本仓库：
 ```bash
-git clone https://github.com/HAIGC/haigc_toolkit.git
+git clone https://github.com/yourusername/haigc_toolkit.git
 ```
 
 3. 安装依赖：
@@ -39,30 +41,14 @@ cd haigc_toolkit
 pip install -r requirements.txt
 ```
 
-4. **配置中文字体**（Linux 用户必读）：
-   - 如果你使用 Linux 系统，需要安装中文字体以避免乱码
-   - 详细配置指南：[字体配置指南](FONT_GUIDE.md)
-   - 快速安装（Ubuntu/Debian）：
-   ```bash
-   sudo apt install fonts-noto-cjk
-   fc-cache -fv
-   ```
-
-5. 重启 ComfyUI
+4. 重启 ComfyUI
 
 ### 方法二：直接下载
 
 1. 下载本仓库的 ZIP 文件
 2. 解压到 `ComfyUI/custom_nodes/haigc_toolkit`
 3. 安装依赖（同上）
-4. 配置中文字体（Linux 用户，参考上方步骤 4）
-5. 重启 ComfyUI
-
-### ⚠️ 重要提示
-
-**Linux 用户必读：** 如果字幕显示为方框或乱码，说明系统缺少中文字体。请查看 [字体配置指南](FONT_GUIDE.md) 解决。
-
-**Windows 用户：** 系统自带中文字体，无需额外配置。
+4. 重启 ComfyUI
 
 ## 🎯 节点列表
 
@@ -75,7 +61,7 @@ pip install -r requirements.txt
 #### 核心功能
 
 - **文字效果**
-  - 3种渐变模式（线性、径向、对角）
+  - 5种渐变模式（线性、径向、对角等）
   - 3级描边位置（外部、居中、内部）
   - 4级字体粗细（常规、粗体、特粗、超粗）
   - 字间距精细控制（-50到200px）
@@ -109,14 +95,52 @@ pip install -r requirements.txt
 - 带字幕的图像序列
 - 视频时长
 - 总帧数
-- 字幕开始时间
-- 字幕结束时间
-
 ```
 
 ---
 
-### 2. 视频拼接过渡 🎞️
+### 2. 多段字幕节点 📝
+
+**节点名称：** `HAIGC_MultiSubtitle`
+
+支持在视频中添加多段独立控制的字幕，每段字幕拥有独立的时间轴和样式。
+
+#### 核心功能
+
+- JSON配置管理
+- 独立时间轴控制
+- 每段独立样式设置
+- 支持字幕叠加显示
+- 灵活的动效控制
+
+#### JSON配置示例
+
+```json
+{
+  "字幕1": {
+    "文本": "第一段字幕",
+    "开始时间": 0.0,
+    "结束时间": 3.0,
+    "字体大小": 48,
+    "颜色": "#FFFFFF",
+    "位置Y": 85.0,
+    "动效": "淡入"
+  },
+  "字幕2": {
+    "文本": "第二段字幕",
+    "开始时间": 3.5,
+    "结束时间": 6.5,
+    "字体大小": 52,
+    "颜色": "#FFFF00",
+    "位置Y": 80.0,
+    "动效": "左飞入"
+  }
+}
+```
+
+---
+
+### 3. 视频拼接过渡 🎞️
 
 **节点名称：** `HAIGC_VideoTransition`
 
@@ -194,7 +218,16 @@ pip install -r requirements.txt
 | 字间距 | ✅ | ✅ | 所有效果 |
 | 动效 | ✅ | ✅ | 所有效果 |
 
+### 性能优化
+
+- **渐变算法**：numpy矢量化计算，性能提升 10-100倍
+- **字体缓存**：避免重复IO操作，显著提升速度
+- **描边优化**：动态采样密度，平衡质量与性能
+- **高质量缩放**：LANCZOS算法，确保视觉质量
+
 ---
+
+## 📚 快速入门
 
 ### 基础工作流示例
 
@@ -210,21 +243,101 @@ pip install -r requirements.txt
 ### 高级工作流示例
 
 ```
-[视频A] →                    
-         [视频拼接过渡] → [字幕节点]
+[视频A] →                    → [视频转换器]
+         [视频拼接过渡] → [多段字幕节点]
 [视频B] →                    ↓
                          [保存视频]
 ```
 
 ---
 
+## 🔧 系统要求
+
+- **ComfyUI**：最新版本
+- **Python**：3.8+
+- **PyTorch**：2.0.0+
+- **其他依赖**：见 `requirements.txt`
+
 ### 推荐配置
 
 - **内存**：8GB+ RAM
 - **显存**：4GB+ VRAM（用于视频处理）
+- **存储**：预留足够空间存放视频文件
 
 ---
 
+## 📝 版本历史
+
+### v2.0.0 (2025-10-28) - 重大更新
+
+**全功能统一支持横竖排**
+
+- ✅ 竖排字幕完整支持描边功能（外部/居中/内部）
+- ✅ 渐变文字完整支持字体粗细（4级）
+- ✅ 描边文字完整支持字体粗细（4级）
+- ✅ 所有功能组合可用（渐变+描边+粗细+竖排）
+- 重构核心渲染函数，统一横竖排逻辑
+- 新增辅助函数：`_draw_text_with_bold`、`_draw_bold_char`
+- 功能覆盖率：横排100%，竖排100%
+
+### v1.9.0 (2025-10-28) - 性能大幅提升
+
+**全面性能优化**
+
+- 渐变算法使用numpy矢量化，性能提升10-100倍
+- 添加字体缓存机制，消除重复IO操作
+- 优化描边算法，动态调整采样密度
+- 使用LANCZOS高质量缩放算法
+- 完善输入验证和错误处理
+
+### v1.7.0 (2025-10-28) - 易用性提升
+
+**新增功能**
+
+- 时间单位默认改为秒数（更直观）
+- 新增字间距设置（-50到200px）
+- 统一时间逻辑（帧数/秒数）
+- 优化日志输出
+
+### v1.6.0 (2025-10-28)
+
+- 动效时长改为秒数（精确到0.01秒）
+- 新增动效速度调节（0.1x-5.0x）
+- 智能动效帧数计算
+
+### v1.3.0 (2025-10-27)
+
+- 新增字体粗细功能（4级）
+- 新增描边功能（参照Photoshop）
+- 描边支持外部、居中、内部三种位置
+
+### v1.2.0 (2025-10-27)
+
+- 新增增强版字幕节点
+- 新增多段字幕节点
+- 新增9种增强动效
+- 新增渐变效果系统
+
+### v1.0.0 (2025-10-27) - 初始发布
+
+- 视频字幕添加节点
+- 图片批次累积节点
+- 获取视频尾帧节点
+- 视频拼接过渡节点
+
+---
+
+## 🤝 贡献指南
+
+欢迎提交 Issue 和 Pull Request！
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送到分支 (`git push origin feature/AmazingFeature`)
+5. 开启 Pull Request
+
+---
 
 ## 📄 许可证
 
@@ -240,6 +353,7 @@ pip install -r requirements.txt
 ---
 
 ## 📮 联系方式
+
 - **问题反馈**：请在 [GitHub Issues](https://github.com/yourusername/haigc_toolkit/issues) 提交
 - **功能建议**：欢迎在 Issues 中讨论
 
@@ -248,9 +362,7 @@ pip install -r requirements.txt
 <div align="center">
 
 **如果这个项目对你有帮助，请给个 ⭐️ Star 支持一下！**
-Comfyui工作流云平台推荐：https://www.runninghub.cn/user-center/1887871050510716930/userPost?inviteCode=rh-v1127
-国际站：https://www.runninghub.ai/user-center/1939305513756864513/userPost?inviteCode=rh-v1127
 
-Made with ❤️ by HAIGC
+Made with ❤️ by HAIGC Team
 
 </div>
