@@ -1,2 +1,10 @@
-numpy>=1.21.0 
-pillow>=9.0.0    
+# HAIGC Toolkit - ComfyUI节点工具集依赖
+
+# 核心依赖
+numpy>=1.24.0
+pillow>=10.0.0
+
+# 可选依赖（用于高级功能）
+# opencv-python>=4.8.0  # 视频处理和光流计算
+# scipy>=1.11.0  # 科学计算
+
