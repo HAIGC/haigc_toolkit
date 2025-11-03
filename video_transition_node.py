@@ -7,6 +7,7 @@ import torch
 import numpy as np
 from PIL import Image
 import torch.nn.functional as F
+import math
 
 class VideoTransitionNode:
     """视频拼接平滑过渡节点"""
@@ -21,6 +22,7 @@ class VideoTransitionNode:
                 "视频A": ("IMAGE",),  # 第一段视频
                 "视频B": ("IMAGE",),  # 第二段视频
                 "过渡类型": ([
+                    "直接拼接",
                     "交叉淡化",
                     "渐变擦除_左到右",
                     "渐变擦除_右到左", 
@@ -59,18 +61,6 @@ class VideoTransitionNode:
                     "step": 1,
                     "display": "number"
                 }),
-            },
-            "optional": {
-                "颜色匹配": ("BOOLEAN", {
-                    "default": False,
-                    "label_on": "启用",
-                    "label_off": "禁用"
-                }),
-                "亮度平滑": ("BOOLEAN", {
-                    "default": False,
-                    "label_on": "启用", 
-                    "label_off": "禁用"
-                }),
             }
         }
     
@@ -102,90 +92,110 @@ class VideoTransitionNode:
         return t
     
     def create_gradient_mask(self, width, height, direction, progress):
-        """创建渐变遮罩"""
-        mask = np.zeros((height, width), dtype=np.float32)
+        """创建渐变遮罩（优化版 - 向量化计算，方向已修正）"""
+        # 避免除以0
+        progress = max(0.001, min(0.999, progress))
         
         if direction == "左到右":
-            for x in range(width):
-                value = (x / width - (1 - progress)) / progress
-                value = np.clip(value, 0, 1)
-                mask[:, x] = value
+            # 从左到右擦除：视频B从左边开始逐渐覆盖视频A
+            # 左边mask值应该先达到1，所以坐标从1到0递减
+            x_coords = np.linspace(1, 0, width, dtype=np.float32)
+            mask = np.clip((x_coords - (1 - progress)) / progress, 0, 1)
+            mask = np.broadcast_to(mask, (height, width)).copy()
                 
         elif direction == "右到左":
-            for x in range(width):
-                value = ((width - x) / width - (1 - progress)) / progress
-                value = np.clip(value, 0, 1)
-                mask[:, x] = value
+            # 从右到左擦除：视频B从右边开始逐渐覆盖视频A
+            # 右边mask值应该先达到1，所以坐标从0到1递增
+            x_coords = np.linspace(0, 1, width, dtype=np.float32)
+            mask = np.clip((x_coords - (1 - progress)) / progress, 0, 1)
+            mask = np.broadcast_to(mask, (height, width)).copy()
                 
         elif direction == "上到下":
-            for y in range(height):
-                value = (y / height - (1 - progress)) / progress
-                value = np.clip(value, 0, 1)
-                mask[y, :] = value
+            # 从上到下擦除：视频B从上方开始逐渐覆盖视频A
+            # 上边mask值应该先达到1，所以坐标从1到0递减
+            y_coords = np.linspace(1, 0, height, dtype=np.float32).reshape(-1, 1)
+            mask = np.clip((y_coords - (1 - progress)) / progress, 0, 1)
+            mask = np.broadcast_to(mask, (height, width)).copy()
                 
         elif direction == "下到上":
-            for y in range(height):
-                value = ((height - y) / height - (1 - progress)) / progress
-                value = np.clip(value, 0, 1)
-                mask[y, :] = value
+            # 从下到上擦除：视频B从下方开始逐渐覆盖视频A
+            # 下边mask值应该先达到1，所以坐标从0到1递增
+            y_coords = np.linspace(0, 1, height, dtype=np.float32).reshape(-1, 1)
+            mask = np.clip((y_coords - (1 - progress)) / progress, 0, 1)
+            mask = np.broadcast_to(mask, (height, width)).copy()
+        else:
+            mask = np.ones((height, width), dtype=np.float32) * progress
         
         return mask
     
     def create_radial_mask(self, width, height, progress, shape="circle"):
-        """创建径向遮罩"""
+        """创建径向遮罩（从中心向外扩散）"""
+        # 避免除以0
+        progress = max(0.001, min(0.999, progress))
+        
         y, x = np.ogrid[:height, :width]
         center_y, center_x = height / 2, width / 2
         
         if shape == "circle":
+            # 圆形扩散：从中心向外
             max_radius = np.sqrt(center_x**2 + center_y**2)
             distance = np.sqrt((x - center_x)**2 + (y - center_y)**2)
-            mask = np.clip((distance - max_radius * (1 - progress)) / (max_radius * progress), 0, 1)
-            mask = 1 - mask  # 反转，使中心先显示
+            # 计算归一化距离
+            normalized_distance = distance / max_radius
+            # 从中心向外扩散：中心先显示(mask=1)，边缘后显示(mask=0)
+            # progress=0时，中心很小范围为1；progress=1时，全部为1
+            mask = np.clip(1 - (normalized_distance - progress) / (1 - progress + 0.001), 0, 1)
             
         elif shape == "square":
+            # 方形扩散：从中心向外
             max_dist = max(center_x, center_y)
             dist_x = np.abs(x - center_x)
             dist_y = np.abs(y - center_y)
             distance = np.maximum(dist_x, dist_y)
-            mask = np.clip((distance - max_dist * (1 - progress)) / (max_dist * progress), 0, 1)
-            mask = 1 - mask
+            # 计算归一化距离
+            normalized_distance = distance / max_dist
+            # 从中心向外扩散
+            mask = np.clip(1 - (normalized_distance - progress) / (1 - progress + 0.001), 0, 1)
         
         return mask.astype(np.float32)
     
-    def match_colors(self, img1, img2, alpha):
-        """颜色匹配 - 使过渡更自然"""
-        # 计算两个图像的平均颜色
-        mean1 = torch.mean(img1, dim=[0, 1], keepdim=True)
-        mean2 = torch.mean(img2, dim=[0, 1], keepdim=True)
+    def create_transition(self, 视频A, 视频B, 过渡类型="交叉淡化",
+                         过渡时长帧数=30,
+                         过渡位置="两者中间", 缓动函数="缓入缓出", 边缘羽化=0):
+        """创建视频过渡效果 - 纯粹的视频拼接和过渡，无色彩调整"""
         
-        # 渐进调整颜色
-        adjusted_img2 = img2 + (mean1 - mean2) * (1 - alpha) * 0.5
-        adjusted_img2 = torch.clamp(adjusted_img2, 0, 1)
-        
-        return adjusted_img2
-    
-    def smooth_brightness(self, img1, img2, alpha):
-        """亮度平滑"""
-        # 计算亮度
-        brightness1 = torch.mean(img1)
-        brightness2 = torch.mean(img2)
-        
-        # 调整第二张图的亮度
-        brightness_ratio = brightness1 / (brightness2 + 1e-6)
-        adjusted_img2 = img2 * (1 + (brightness_ratio - 1) * (1 - alpha) * 0.3)
-        adjusted_img2 = torch.clamp(adjusted_img2, 0, 1)
-        
-        return adjusted_img2
-    
-    def create_transition(self, 视频A, 视频B, 过渡类型="交叉淡化", 过渡时长帧数=30,
-                         过渡位置="两者中间", 缓动函数="缓入缓出", 边缘羽化=0,
-                         颜色匹配=False, 亮度平滑=False):
-        """创建视频过渡效果"""
+        print(f"[视频拼接节点] 纯粹拼接模式（已移除所有色彩调整）")
         
         batch_a = 视频A.shape[0]
         batch_b = 视频B.shape[0]
         height = 视频A.shape[1]
         width = 视频A.shape[2]
+        
+        # 如果是直接拼接，不应用任何色彩调整，保持视频原色
+        if 过渡类型 == "直接拼接":
+            # 确保两个视频尺寸一致
+            if 视频B.shape[1] != height or 视频B.shape[2] != width:
+                视频B_resized = []
+                for i in range(batch_b):
+                    frame = 视频B[i].cpu().numpy()
+                    frame_pil = Image.fromarray((frame * 255).astype(np.uint8))
+                    frame_pil = frame_pil.resize((width, height), Image.LANCZOS)
+                    frame_resized = np.array(frame_pil).astype(np.float32) / 255.0
+                    视频B_resized.append(frame_resized)
+                视频B = torch.from_numpy(np.stack(视频B_resized)).to(视频A.device)
+            
+            # 直接拼接，无色彩调整，保持视频原色
+            
+            # 直接拼接两个视频
+            final_output = torch.cat([视频A, 视频B], dim=0)
+            total_frames = final_output.shape[0]
+            
+            print(f"视频直接拼接完成:")
+            print(f"  - 视频A帧数: {batch_a}")
+            print(f"  - 视频B帧数: {batch_b}")
+            print(f"  - 总输出帧数: {total_frames}")
+            
+            return (final_output, total_frames)
         
         # 确保两个视频尺寸一致
         if 视频B.shape[1] != height or 视频B.shape[2] != width:
@@ -228,7 +238,7 @@ class VideoTransitionNode:
         transition_frames_a = transition_frames_a[:actual_transition_frames]
         transition_frames_b = transition_frames_b[:actual_transition_frames]
         
-        # 生成过渡帧
+        # 生成过渡帧（无色彩调整）
         transition_output = []
         
         for i in range(actual_transition_frames):
@@ -238,14 +248,6 @@ class VideoTransitionNode:
             
             frame_a = transition_frames_a[i]
             frame_b = transition_frames_b[i]
-            
-            # 应用颜色匹配
-            if 颜色匹配:
-                frame_b = self.match_colors(frame_a, frame_b, progress)
-            
-            # 应用亮度平滑
-            if 亮度平滑:
-                frame_b = self.smooth_brightness(frame_a, frame_b, progress)
             
             # 根据过渡类型创建帧
             if 过渡类型 == "交叉淡化":
@@ -287,29 +289,60 @@ class VideoTransitionNode:
             elif 过渡类型.startswith("推移"):
                 direction = 过渡类型.split("_")[1]
                 if direction == "左":
+                    # 向左推移：A向左移出，B从右侧进入
                     offset = int(width * progress)
+                    offset = min(offset, width)  # 防止越界
                     blended = torch.zeros_like(frame_a)
                     if offset < width:
+                        # A的剩余部分
                         blended[:, :width-offset, :] = frame_a[:, offset:, :]
+                        # B进入的部分
                         blended[:, width-offset:, :] = frame_b[:, :offset, :]
+                    else:
+                        # offset >= width，完全显示B
+                        blended = frame_b.clone()
+                        
                 elif direction == "右":
+                    # 向右推移：A向右移出，B从左侧进入
                     offset = int(width * progress)
+                    offset = min(offset, width)
                     blended = torch.zeros_like(frame_a)
                     if offset < width:
+                        # A的剩余部分
                         blended[:, offset:, :] = frame_a[:, :width-offset, :]
+                        # B进入的部分
                         blended[:, :offset, :] = frame_b[:, width-offset:, :]
+                    else:
+                        # offset >= width，完全显示B
+                        blended = frame_b.clone()
+                        
                 elif direction == "上":
+                    # 向上推移：A向上移出，B从下方进入
                     offset = int(height * progress)
+                    offset = min(offset, height)
                     blended = torch.zeros_like(frame_a)
                     if offset < height:
+                        # A的剩余部分
                         blended[:height-offset, :, :] = frame_a[offset:, :, :]
+                        # B进入的部分
                         blended[height-offset:, :, :] = frame_b[:offset, :, :]
+                    else:
+                        # offset >= height，完全显示B
+                        blended = frame_b.clone()
+                        
                 elif direction == "下":
+                    # 向下推移：A向下移出，B从上方进入
                     offset = int(height * progress)
+                    offset = min(offset, height)
                     blended = torch.zeros_like(frame_a)
                     if offset < height:
+                        # A的剩余部分
                         blended[offset:, :, :] = frame_a[:height-offset, :, :]
+                        # B进入的部分
                         blended[:offset, :, :] = frame_b[height-offset:, :, :]
+                    else:
+                        # offset >= height，完全显示B
+                        blended = frame_b.clone()
                 else:
                     blended = frame_a * (1 - progress) + frame_b * progress
                     
@@ -320,14 +353,61 @@ class VideoTransitionNode:
                 blended = frame_a * (1 - mask) + frame_b * mask
                 
             elif 过渡类型 == "缩放过渡":
+                # 真正的缩放效果：A缩小消失，B放大出现
                 if progress < 0.5:
-                    # 缩小A
-                    scale = 1 - progress
-                    blended = frame_a * scale + frame_b * (1 - scale) * 0.5
+                    # 前半段：A缩小到中心
+                    scale_factor = 1.0 - progress  # 1.0 -> 0.5
+                    if scale_factor > 0.01:
+                        # 计算缩放后的尺寸
+                        new_h = max(1, int(height * scale_factor))
+                        new_w = max(1, int(width * scale_factor))
+                        
+                        # 缩放A（HWC -> CHW -> NCHW -> 缩放 -> NCHW -> CHW -> HWC）
+                        frame_a_resized = F.interpolate(
+                            frame_a.permute(2, 0, 1).unsqueeze(0),  # HWC -> NCHW
+                            size=(new_h, new_w),
+                            mode='bilinear',
+                            align_corners=False
+                        ).squeeze(0).permute(1, 2, 0)  # NCHW -> HWC
+                        
+                        # 居中放置缩放后的A，其余用B填充（淡入）
+                        blended = frame_b.clone()
+                        y_offset = (height - new_h) // 2
+                        x_offset = (width - new_w) // 2
+                        
+                        # 混合系数：随着进度增加，A的不透明度降低
+                        alpha = 1.0 - (progress * 2)  # 1.0 -> 0.0
+                        blended[y_offset:y_offset+new_h, x_offset:x_offset+new_w, :] = \
+                            frame_a_resized * alpha + blended[y_offset:y_offset+new_h, x_offset:x_offset+new_w, :] * (1 - alpha)
+                    else:
+                        # 缩得太小了，直接显示B
+                        blended = frame_b.clone()
+                        
                 else:
-                    # 放大B
-                    scale = (progress - 0.5) * 2
-                    blended = frame_b * scale + frame_a * (1 - scale) * 0.5
+                    # 后半段：B从中心放大
+                    scale_factor = (progress - 0.5) * 2  # 0.0 -> 1.0
+                    if scale_factor < 0.99:
+                        # B从小放大
+                        initial_scale = 0.1 + scale_factor * 0.9  # 0.1 -> 1.0
+                        new_h = max(1, int(height * initial_scale))
+                        new_w = max(1, int(width * initial_scale))
+                        
+                        # 缩放B
+                        frame_b_resized = F.interpolate(
+                            frame_b.permute(2, 0, 1).unsqueeze(0),
+                            size=(new_h, new_w),
+                            mode='bilinear',
+                            align_corners=False
+                        ).squeeze(0).permute(1, 2, 0)
+                        
+                        # 居中放置，背景用B的模糊版本
+                        blended = frame_b.clone()
+                        y_offset = (height - new_h) // 2
+                        x_offset = (width - new_w) // 2
+                        blended[y_offset:y_offset+new_h, x_offset:x_offset+new_w, :] = frame_b_resized
+                    else:
+                        # 已经放大到全尺寸
+                        blended = frame_b.clone()
             else:
                 # 默认交叉淡化
                 blended = frame_a * (1 - progress) + frame_b * progress

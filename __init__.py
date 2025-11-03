@@ -4,6 +4,7 @@ HAIGC Toolkit - ComfyUI节点工具集
 """
 
 from .subtitle_node_enhanced import VideoSubtitleEnhancedNode
+from .subtitle_timestamp_pro_node import VideoSubtitleTimestampProNode
 from .image_accumulator_node import ImageAccumulatorNode
 from .video_last_frame_node import VideoLastFrameNode
 from .video_transition_node import VideoTransitionNode
@@ -15,6 +16,7 @@ print_version_info()
 # 节点类映射
 NODE_CLASS_MAPPINGS = {
     "HAIGC_VideoSubtitleEnhanced": VideoSubtitleEnhancedNode,
+    "HAIGC_VideoSubtitleTimestampPro": VideoSubtitleTimestampProNode,
     "HAIGC_ImageAccumulator": ImageAccumulatorNode,
     "HAIGC_VideoLastFrame": VideoLastFrameNode,
     "HAIGC_VideoTransition": VideoTransitionNode,
@@ -23,6 +25,7 @@ NODE_CLASS_MAPPINGS = {
 # 节点显示名称映射（中文）
 NODE_DISPLAY_NAME_MAPPINGS = {
     "HAIGC_VideoSubtitleEnhanced": "视频字幕增强版(v2.0) 🎬",
+    "HAIGC_VideoSubtitleTimestampPro": "视频字幕时间戳(专业版) ⚡",
     "HAIGC_ImageAccumulator": "图片批次累积 📦",
     "HAIGC_VideoLastFrame": "获取视频尾帧 🎞️",
     "HAIGC_VideoTransition": "视频拼接过渡 🔗",
